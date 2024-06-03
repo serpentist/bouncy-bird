@@ -1,3 +1,4 @@
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <node.hpp>
@@ -10,33 +11,149 @@ namespace bb {
 std::unique_ptr<sf::RenderWindow> create_window(unsigned w, unsigned h);
 std::unique_ptr<sf::Font> load_font(const std::string &f);
 std::unique_ptr<node_t> create_scene();
+std::unique_ptr<node_t> build_main_menu(const sf::Vector2u &);
+} // namespace bb
 
-class button_t;
+namespace bb {
+struct resource_g {
+  static inline std::unique_ptr<sf::Font> main_font{};
+};
+} // namespace bb
+
+namespace bb {
+class input_g {
+public:
+  input_g() = delete;
+  static void update_mouse_position(const sf::RenderWindow &w) {
+    mouse_pos_old_ = mouse_pos_new_;
+    mouse_pos_new_ = sf::Mouse::getPosition(w);
+  }
+  static sf::Vector2i new_mouse_position() { return mouse_pos_new_; }
+  static sf::Vector2i old_mouse_position() { return mouse_pos_old_; }
+
+private:
+  static inline sf::Vector2i mouse_pos_new_;
+  static inline sf::Vector2i mouse_pos_old_;
+};
+} // namespace bb
+
+namespace bb {
+class button_t : public node_t {
+public:
+  void listen_this(const sf::Event &) override {}
+
+  void update_this() override {
+    if (sf::Mouse::isButtonPressed(sf::Mouse::Left) &&
+        box_.getGlobalBounds().contains(
+            static_cast<sf::Vector2f>(input_g::new_mouse_position())))
+      pressed_ = true;
+    else
+      pressed_ = false;
+    if (on_click_ && pressed_)
+      on_click_(this);
+  }
+
+  void render(sf::RenderTarget &t, sf::RenderStates s) const override {
+    t.draw(box_, s);
+    if (font_)
+      t.draw(label_, s);
+  }
+
+  void on_click(std::function<void(node_t *)> cb) { on_click_ = std::move(cb); }
+  void label(const std::string &str, sf::Font *f = nullptr) {
+    if (f)
+      font_ = f;
+    label_.setFont(*font_);
+    label_.setString(str);
+  }
+
+  void label_color(const sf::Color &c) { label_.setFillColor(c); }
+  void label_size(unsigned size) { label_.setCharacterSize(size); }
+  void label_center() {
+    auto x = (box_.getPosition().x - label_.getGlobalBounds().width) / 2.f;
+    auto y = (box_.getPosition().y - label_.getGlobalBounds().height) / 2.f;
+    label_.setPosition(box_.getPosition() +
+                       sf::Vector2f{x / 2 - box_.getOutlineThickness(),
+                                    y / 2 - box_.getOutlineThickness()});
+  }
+
+  void box_size(const sf::Vector2f &size) { box_.setSize(size); }
+  void box_color(const sf::Color &color) { box_.setFillColor(color); }
+  void box_stroke(const sf::Color &c, unsigned t = 0) {
+    box_.setOutlineColor(c);
+    if (t)
+      box_.setOutlineThickness(t);
+  }
+  void box_position(const sf::Vector2f &pos) { box_.setPosition(pos); }
+
+private:
+  bool pressed_;
+  sf::Font *font_;
+  sf::RectangleShape box_;
+  sf::Text label_;
+  std::function<void(button_t *)> on_click_;
+};
+} // namespace bb
+
+namespace bb {
+enum class qcmd_t { goto_main_menu, goto_game };
+}
+
+namespace bb {
+struct cmdq_g {
+public:
+  cmdq_g() = delete;
+  static void push(qcmd_t cmd) { commands.push_back(cmd); }
+
+  static inline std::unique_ptr<node_t> menu_scene;
+  static inline std::unique_ptr<node_t> game_scene;
+
+  static void update() {
+    while (commands.size()) {
+      switch (commands.front()) {
+      case qcmd_t::goto_main_menu:
+        active_scene = menu_scene.get();
+        break;
+      case qcmd_t::goto_game:
+        active_scene = game_scene.get();
+        break;
+      }
+      commands.pop_front();
+    }
+  }
+
+  static inline std::list<qcmd_t> commands;
+  static inline node_t *active_scene;
+};
 } // namespace bb
 
 int main() {
-  auto mfont = bb::load_font(bb::main_font_path.data());
-  if (!mfont) {
+  bb::resource_g::main_font = bb::load_font(bb::main_font_path.data());
+  if (!bb::resource_g::main_font) {
     std::cerr << "Failed to load the main font!" << std::endl;
     return 1;
   }
 
-  auto menu_scene = bb::create_scene();
-  auto game_scene = bb::create_scene();
-  bb::node_t *active_scene = menu_scene.get();
-
   auto window = bb::create_window(640, 480);
+  bb::cmdq_g::menu_scene = bb::build_main_menu(window->getSize());
+  bb::cmdq_g::game_scene = bb::create_scene();
+  bb::cmdq_g::push(bb::qcmd_t::goto_main_menu);
+
   while (window->isOpen()) {
+    bb::cmdq_g::update();
     sf::Event event;
     while (window->pollEvent(event)) {
       if (event.type == sf::Event::KeyPressed &&
           event.key.code == sf::Keyboard::Escape)
         window->close();
-      active_scene->listen(event);
+      bb::cmdq_g::active_scene->listen(event);
     }
 
+    bb::input_g::update_mouse_position(*window);
+    bb::cmdq_g::active_scene->update();
+
     window->clear();
-    window->draw(*active_scene);
+    window->draw(*bb::cmdq_g::active_scene);
     window->display();
   }
 
@@ -60,22 +177,31 @@ std::unique_ptr<sf::Font> load_font(const std::string &f) {
 } // namespace bb
 
 namespace bb {
-class button_t : public node_t {
-public:
-  button_t(sf::Font *fp, const std::string &l);
-  void listen_this(const sf::Event &) override;
-  void update_this() override;
-  void draw(sf::RenderTarget &, sf::RenderStates) const override;
-
-private:
-  sf::Font *font_;
-  sf::RectangleShape box_;
-  sf::Text label_;
-};
+std::unique_ptr<node_t> create_scene() {
+  return std::unique_ptr<node_t>{new node_t{}};
+}
 } // namespace bb
 
 namespace bb {
-std::unique_ptr<node_t> create_scene() {
-  return std::unique_ptr<node_t>{new node_t{}};
+std::unique_ptr<node_t> build_main_menu(const sf::Vector2u &ws) {
+  auto root = create_scene();
+  std::unique_ptr<node_t> play_button{new button_t{}};
+  dynamic_cast<button_t *>(play_button.get())
+      ->label("Play", resource_g::main_font.get());
+  dynamic_cast<button_t *>(play_button.get())->label_color(sf::Color::White);
+  dynamic_cast<button_t *>(play_button.get())->label_size(50);
+  dynamic_cast<button_t *>(play_button.get())->on_click([](node_t *) {
+    std::cout << "clicked...\n";
+    cmdq_g::push(qcmd_t::goto_game);
+  });
+  constexpr float bw = 150.f, bh = 100.f;
+  dynamic_cast<button_t *>(play_button.get())->box_size({bw, bh});
+  dynamic_cast<button_t *>(play_button.get())->box_color(sf::Color::Black);
+  dynamic_cast<button_t *>(play_button.get())->box_stroke(sf::Color::White, 10);
+  dynamic_cast<button_t *>(play_button.get())
+      ->box_position({(ws.x - bw) / 2.f, (ws.y - bh) / 2.f});
+  dynamic_cast<button_t *>(play_button.get())->label_center();
+  root->add(std::move(play_button));
+  return root;
 }
 } // namespace bb

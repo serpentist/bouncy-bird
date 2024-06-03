@@ -13,20 +13,18 @@ public:
   node_t &operator=(node_t &&) = default;
   node_t(node_t &&) = default;
 
-  node_t *add(node_t n) {
-    n.parent_ = this;
+  node_t *add(std::unique_ptr<node_t> n) {
+    n->parent_ = this;
     children_.push_back(std::move(n));
-    return &children_.back();
+    return children_.back().get();
   }
   void remove(node_t *n) {
     auto it = children_.begin();
     for (; it != children_.end(); ++it)
-      if (&(*it) == n)
+      if (it->get() == n)
         break;
-    if (it != children_.end()) {
-      it->parent_ = nullptr;
+    if (it != children_.end())
       children_.erase(it);
-    }
   }
   node_t *parent() { return parent_; }
   const node_t *parent() const { return parent_; }
@@ -34,25 +32,26 @@ public:
   void listen(const sf::Event &e) {
     listen_this(e);
     for (auto &c : children_)
-      c.listen(e);
+      c->listen(e);
   }
   void update() {
     update_this();
     for (auto &c : children_)
-      c.update();
+      c->update();
   }
-  void render(sf::RenderTarget &t, sf::RenderStates s) {
-    this->draw(t, s);
+  void draw(sf::RenderTarget &t, sf::RenderStates s) const override {
+    this->render(t, s);
     for (auto &c : children_)
-      c.render(t, s);
+      c->draw(t, s);
   }
+
+  virtual void render(sf::RenderTarget &, sf::RenderStates) const {}
 
   virtual void listen_this(const sf::Event &) {}
   virtual void update_this() {}
-  void draw(sf::RenderTarget &, sf::RenderStates) const override {}
 
 private:
   node_t *parent_;
-  std::list<node_t> children_;
+  std::list<std::unique_ptr<node_t>> children_;
 };
 } // namespace bb
