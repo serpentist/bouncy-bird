@@ -1,0 +1,81 @@
+#include <iostream>
+#include <memory>
+#include <node.hpp>
+
+namespace bb {
+constexpr std::string_view main_font_path{"@MAIN_FONT_PATH@"};
+}
+
+namespace bb {
+std::unique_ptr<sf::RenderWindow> create_window(unsigned w, unsigned h);
+std::unique_ptr<sf::Font> load_font(const std::string &f);
+std::unique_ptr<node_t> create_scene();
+
+class button_t;
+} // namespace bb
+
+int main() {
+  auto mfont = bb::load_font(bb::main_font_path.data());
+  if (!mfont) {
+    std::cerr << "Failed to load the main font!" << std::endl;
+    return 1;
+  }
+
+  auto menu_scene = bb::create_scene();
+  auto game_scene = bb::create_scene();
+  bb::node_t *active_scene = menu_scene.get();
+
+  auto window = bb::create_window(640, 480);
+  while (window->isOpen()) {
+    sf::Event event;
+    while (window->pollEvent(event)) {
+      if (event.type == sf::Event::KeyPressed &&
+          event.key.code == sf::Keyboard::Escape)
+        window->close();
+      active_scene->listen(event);
+    }
+
+    window->clear();
+    window->draw(*active_scene);
+    window->display();
+  }
+
+  return 0;
+}
+
+namespace bb {
+std::unique_ptr<sf::RenderWindow> create_window(unsigned w, unsigned h) {
+  return std::unique_ptr<sf::RenderWindow>{new sf::RenderWindow{
+      sf::VideoMode{w, h}, "Bouncy Bird", sf::Style::None}};
+}
+} // namespace bb
+
+namespace bb {
+std::unique_ptr<sf::Font> load_font(const std::string &f) {
+  std::unique_ptr<sf::Font> ptr{new sf::Font{}};
+  if (!ptr->loadFromFile(f))
+    return {};
+  return ptr;
+}
+} // namespace bb
+
+namespace bb {
+class button_t : public node_t {
+public:
+  button_t(sf::Font *fp, const std::string &l);
+  void listen_this(const sf::Event &) override;
+  void update_this() override;
+  void draw(sf::RenderTarget &, sf::RenderStates) const override;
+
+private:
+  sf::Font *font_;
+  sf::RectangleShape box_;
+  sf::Text label_;
+};
+} // namespace bb
+
+namespace bb {
+std::unique_ptr<node_t> create_scene() {
+  return std::unique_ptr<node_t>{new node_t{}};
+}
+} // namespace bb

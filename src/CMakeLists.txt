@@ -7,7 +7,9 @@ else()
 	add_compile_options(-O0 -g)
 endif()
 
-add_executable(run main.cpp)
+set(MAIN_FONT_PATH ${CMAKE_BINARY_DIR}/bin/main_font.ttf)
+configure_file(main.cpp.in ${CMAKE_BINARY_DIR}/main.cpp @ONLY)
+add_executable(run ${CMAKE_BINARY_DIR}/main.cpp)
 
 target_link_libraries(run PRIVATE
 	sfml-system
@@ -15,4 +17,12 @@ target_link_libraries(run PRIVATE
 	sfml-network
 	sfml-graphics
 	sfml-window
+)
+
+target_include_directories(run PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+set_target_properties(run PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
