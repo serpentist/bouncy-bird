@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
+#include <chrono>
 #include <list>
 
 namespace bb {
@@ -73,7 +74,16 @@ public:
   }
   void scale(float x, float y) { sprite_.setScale(sf::Vector2f{x, y}); }
   void position(float x, float y) { sprite_.setPosition(x, y); }
-  void update_this() override {}
+  void flap_freq(unsigned millisec = 500) { flap_freq_ = millisec; }
+  void update_this() override {
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now() - time_since_flap_)
+            .count() < flap_freq_)
+      return;
+    time_since_flap_ = std::chrono::system_clock::now();
+    offset_.x = (offset_.x + size_) % (frames_ * size_);
+    sprite_.setTextureRect(sf::IntRect{offset_, sf::Vector2i{size_, size_}});
+  }
 
   void render(sf::RenderTarget &t, sf::RenderStates s) const override {
     t.draw(sprite_, s);
@@ -82,9 +92,10 @@ public:
 private:
   sf::Vector2i offset_;
   int size_;
-  unsigned frames_;
+  unsigned frames_, flap_freq_;
   sf::Texture *texture_;
   sf::Sprite sprite_;
+  decltype(std::chrono::system_clock::now()) time_since_flap_;
 };
 } // namespace bb
 

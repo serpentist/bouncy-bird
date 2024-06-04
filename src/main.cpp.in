@@ -160,9 +160,10 @@ namespace bb {
 std::unique_ptr<node_t> build_game_scene() {
   auto root = bb::create_scene();
   auto bird_ptr = new bird_t{};
-  bird_ptr->texture(resource_g::bird_texture.get(), {0, 200}, 160, 8);
+  bird_ptr->texture(resource_g::bird_texture.get(), {0, 160}, 160, 8);
   bird_ptr->scale(-0.4f, 0.4f);
   bird_ptr->position(320, 240);
+  bird_ptr->flap_freq(100);
   root->add(std::unique_ptr<node_t>{bird_ptr});
   return root;
 }
