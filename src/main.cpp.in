@@ -26,6 +26,8 @@ struct resource_g {
   static inline std::unique_ptr<sf::RenderWindow> window;
   static inline std::unique_ptr<sf::Font> main_font{};
   static inline std::unique_ptr<sf::Texture> bird_texture{};
+  static inline std::unique_ptr<b2World> world_ptr{};
+  static inline b2Body *bird_body{};
 };
 } // namespace bb
 
@@ -37,6 +39,7 @@ int main() {
 
   auto start_frame = std::chrono::system_clock::now();
   constexpr double frame_time = 1000.0 / 60.0;
+  constexpr double ft_in_sec = frame_time * 1000;
   while (bb::resource_g::window->isOpen()) {
     bb::cmdq_g::update();
     sf::Event event;
@@ -55,6 +58,7 @@ int main() {
         bb::cmdq_g::active_scene->listen(event);
     }
     if (update) {
+      bb::resource_g::world_ptr->Step(ft_in_sec, 6, 2);
       bb::input_g::update_mouse_position(*bb::resource_g::window);
       bb::cmdq_g::active_scene->update();
     }
@@ -170,13 +174,25 @@ bool initialize_gui() {
 
 namespace bb {
 std::unique_ptr<node_t> build_game_scene() {
+  // Setting up the physics
+  resource_g::world_ptr =
+      std::unique_ptr<b2World>{new b2World{b2Vec2{0, -9.8f}}};
+  b2BodyDef bird_def{};
+  bird_def.position.Set(0.f, 0.f);
+  bird_def.type = b2_dynamicBody;
+  resource_g::bird_body = resource_g::world_ptr->CreateBody(&bird_def);
+  b2PolygonShape bird_bounds{};
+  bird_bounds.SetAsBox(1.f, 1.f);
+  resource_g::bird_body->CreateFixture(&bird_bounds, 1.f); // density = 1kg/m^3
+
+  // Setting up the scene graph
   auto root = bb::create_scene();
   auto bird_ptr = new bird_t{};
   bird_ptr->texture(resource_g::bird_texture.get(), {0, 160}, 160, 8);
   bird_ptr->scale(-0.4f, 0.4f);
   bird_ptr->position(320, 240);
   bird_ptr->flap_freq(100);
-  // bird_ptr->phy_body(resource_g::bird_body);
+  bird_ptr->phy_body(resource_g::bird_body);
   root->add(std::unique_ptr<node_t>{bird_ptr});
   return root;
 }

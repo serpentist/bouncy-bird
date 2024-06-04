@@ -86,11 +86,15 @@ public:
   void position(float x, float y) { sprite_.setPosition(x, y); }
   void flap_freq(unsigned millisec = 500) { flap_freq_ = millisec; }
   void update_this() override {
+    if (body_) {
+      sprite_.move(body_->GetPosition().x * 1, body_->GetPosition().y * -1);
+    }
     if (std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - time_since_flap_)
             .count() < flap_freq_)
       return;
     time_since_flap_ = std::chrono::system_clock::now();
+
     offset_.x = (offset_.x + size_) % (frames_ * size_);
     sprite_.setTextureRect(sf::IntRect{offset_, sf::Vector2i{size_, size_}});
   }
@@ -98,6 +102,7 @@ public:
   void render(sf::RenderTarget &t, sf::RenderStates s) const override {
     t.draw(sprite_, s);
   }
+  void phy_body(b2Body *body) { body_ = body; }
 
 private:
   sf::Vector2i offset_;
@@ -106,6 +111,7 @@ private:
   sf::Texture *texture_;
   sf::Sprite sprite_;
   decltype(std::chrono::system_clock::now()) time_since_flap_;
+  b2Body *body_;
 };
 } // namespace bb
 
