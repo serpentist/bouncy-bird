@@ -1,3 +1,4 @@
+#include <box2d/box2d.h>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -34,18 +35,29 @@ int main() {
     return 1;
   }
 
+  auto start_frame = std::chrono::system_clock::now();
+  constexpr double frame_time = 1000.0 / 60.0;
   while (bb::resource_g::window->isOpen()) {
     bb::cmdq_g::update();
     sf::Event event;
+
+    bool update = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::system_clock::now() - start_frame)
+                      .count() >= frame_time;
+    if (update)
+      start_frame = std::chrono::system_clock::now();
+
     while (bb::resource_g::window->pollEvent(event)) {
       if (event.type == sf::Event::KeyPressed &&
           event.key.code == sf::Keyboard::Escape)
         bb::resource_g::window->close();
-      bb::cmdq_g::active_scene->listen(event);
+      if (update)
+        bb::cmdq_g::active_scene->listen(event);
     }
-
-    bb::input_g::update_mouse_position(*bb::resource_g::window);
-    bb::cmdq_g::active_scene->update();
+    if (update) {
+      bb::input_g::update_mouse_position(*bb::resource_g::window);
+      bb::cmdq_g::active_scene->update();
+    }
 
     bb::resource_g::window->clear();
     bb::resource_g::window->draw(*bb::cmdq_g::active_scene);
@@ -164,6 +176,7 @@ std::unique_ptr<node_t> build_game_scene() {
   bird_ptr->scale(-0.4f, 0.4f);
   bird_ptr->position(320, 240);
   bird_ptr->flap_freq(100);
+  // bird_ptr->phy_body(resource_g::bird_body);
   root->add(std::unique_ptr<node_t>{bird_ptr});
   return root;
 }

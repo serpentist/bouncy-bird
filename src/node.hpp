@@ -7,7 +7,7 @@
 namespace bb {
 class node_t : public sf::Drawable {
 public:
-  node_t() = default;
+  node_t() : visible_{true}, frozen_{false} {}
   virtual ~node_t() = default;
   node_t &operator=(const node_t &) = delete;
   node_t(const node_t &) = delete;
@@ -31,17 +31,20 @@ public:
   const node_t *parent() const { return parent_; }
 
   void listen(const sf::Event &e) {
-    listen_this(e);
+    if (!frozen_)
+      listen_this(e);
     for (auto &c : children_)
       c->listen(e);
   }
   void update() {
-    update_this();
+    if (!frozen_)
+      update_this();
     for (auto &c : children_)
       c->update();
   }
   void draw(sf::RenderTarget &t, sf::RenderStates s) const override {
-    this->render(t, s);
+    if (visible_)
+      this->render(t, s);
     for (auto &c : children_)
       c->draw(t, s);
   }
@@ -51,9 +54,16 @@ public:
   virtual void listen_this(const sf::Event &) {}
   virtual void update_this() {}
 
+  bool visible() const { return visible_; }
+  bool frozen() const { return frozen_; }
+  void visible(bool x) { visible_ = x; }
+  void frozen(bool x) { frozen_ = x; }
+
 private:
   node_t *parent_;
   std::list<std::unique_ptr<node_t>> children_;
+  bool visible_;
+  bool frozen_;
 };
 } // namespace bb
 
