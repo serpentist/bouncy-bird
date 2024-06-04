@@ -1,3 +1,6 @@
+find_package(box2d REQUIRED)
+find_package(SFML COMPONENTS system window network audio graphics REQUIRED)
+
 add_compile_options(-Wall -Wextra -Wpedantic)
 
 set(CMAKE_BUILD_TYPE "Release")
@@ -17,6 +20,7 @@ target_link_libraries(run PRIVATE
 	sfml-network
 	sfml-graphics
 	sfml-window
+	box2d
 )
 
 target_include_directories(run PRIVATE
