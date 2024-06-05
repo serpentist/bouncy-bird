@@ -68,6 +68,30 @@ private:
 } // namespace bb
 
 namespace bb {
+class game_t : public node_t {
+public:
+  void step_parameters(double a, double b, double c) {
+    framerate_ = a;
+    velocity_ = b;
+    position_ = c;
+  }
+  void update_this() override {
+    world_->Step(framerate_, velocity_, position_);
+  }
+  void initialize_world(float gravity) {
+    world_ = std::unique_ptr<b2World>(new b2World(b2Vec2{0, gravity}));
+  }
+  b2World *world() { return world_.get(); }
+
+private:
+  double framerate_;
+  double velocity_;
+  double position_;
+  std::unique_ptr<b2World> world_;
+};
+} // namespace bb
+
+namespace bb {
 class bird_t : public node_t {
 public:
   void texture(sf::Texture *t, sf::Vector2i offset = {}, int size = 0,
@@ -87,7 +111,10 @@ public:
   void flap_freq(unsigned millisec = 500) { flap_freq_ = millisec; }
   void update_this() override {
     if (body_) {
-      sprite_.move(body_->GetPosition().x * 1, body_->GetPosition().y * -1);
+      if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+        body_->SetLinearVelocity(b2Vec2{0.f, 0.02f});
+      sprite_.move(body_->GetPosition().x * size_,
+                   body_->GetPosition().y * -size_);
     }
     if (std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now() - time_since_flap_)
