@@ -56,6 +56,7 @@ int main() {
         bb::cmdq_g::active_scene->listen(event);
     }
     if (update) {
+      bb::input_g::update_wall_height(64, bb::resource_g::window->getSize().y);
       bb::input_g::update_mouse_position(*bb::resource_g::window);
       bb::cmdq_g::active_scene->update();
     }
@@ -126,6 +127,29 @@ std::unique_ptr<node_t> build_main_menu(const sf::Vector2u &ws) {
 } // namespace bb
 
 namespace bb {
+std::unique_ptr<node_t> build_game_over(const sf::Vector2u &ws) {
+  auto root = create_scene();
+  std::unique_ptr<node_t> exit_button{new button_t{}};
+  dynamic_cast<button_t *>(exit_button.get())
+      ->label("Game Over", resource_g::main_font.get());
+  dynamic_cast<button_t *>(exit_button.get())->label_color(sf::Color::White);
+  dynamic_cast<button_t *>(exit_button.get())->label_size(50);
+  dynamic_cast<button_t *>(exit_button.get())->on_click([](node_t *) {
+    resource_g::window->close();
+  });
+  constexpr float bw = 400.f, bh = 100.f;
+  dynamic_cast<button_t *>(exit_button.get())->box_size({bw, bh});
+  dynamic_cast<button_t *>(exit_button.get())->box_color(sf::Color::Black);
+  dynamic_cast<button_t *>(exit_button.get())->box_stroke(sf::Color::White, 10);
+  dynamic_cast<button_t *>(exit_button.get())
+      ->box_position({(ws.x - bw) / 2.f, (ws.y - bh) / 2.f});
+  dynamic_cast<button_t *>(exit_button.get())->label_center();
+  root->add(std::move(exit_button));
+  return root;
+}
+} // namespace bb
+
+namespace bb {
 bool initialize_resources() {
   bb::resource_g::main_font = bb::load_font(bb::main_font_path.data());
   if (!bb::resource_g::main_font) {
@@ -165,6 +189,7 @@ bool initialize_gui() {
     bb::cmdq_g::push(bb::qcmd_t::goto_main_menu);
 
     bb::cmdq_g::game_scene = bb::build_game_scene();
+    bb::cmdq_g::game_over = bb::build_game_over(resource_g::window->getSize());
   } catch (...) {
     return false;
   }
@@ -187,7 +212,7 @@ std::unique_ptr<node_t> build_game_scene() {
   resource_g::bird_body = resource_g::world_ptr->CreateBody(&bird_def);
   b2PolygonShape bird_bounds{};
   bird_bounds.SetAsBox(1.f, 1.f);
-  resource_g::bird_body->CreateFixture(&bird_bounds, 1.f); // density = 1kg/m^3
+  resource_g::bird_body->CreateFixture(&bird_bounds, 1.f);
 
   // Setting up the scene graph
   auto bird_ptr = new bird_t{};
@@ -197,6 +222,48 @@ std::unique_ptr<node_t> build_game_scene() {
   bird_ptr->flap_freq(100);
   bird_ptr->phy_body(resource_g::bird_body);
   game->add(std::unique_ptr<node_t>{bird_ptr});
+
+  auto floor_ptr = new plat_t{};
+  game->add(std::unique_ptr<node_t>{floor_ptr});
+  floor_ptr->box()->setPosition(0, 0);
+  floor_ptr->box()->setSize(sf::Vector2f{640, 10});
+  floor_ptr->box()->setFillColor(sf::Color::Magenta);
+  floor_ptr->target(bird_ptr);
+
+  auto ceiling_ptr = new plat_t{};
+  game->add(std::unique_ptr<node_t>{ceiling_ptr});
+  ceiling_ptr->box()->setPosition(0, 470);
+  ceiling_ptr->box()->setSize(sf::Vector2f{640, 10});
+  ceiling_ptr->box()->setFillColor(sf::Color::Magenta);
+  ceiling_ptr->target(bird_ptr);
+
+  input_g::update_wall_height(64, 480);
+
+  auto top_wall = new wall_t{};
+  game->add(std::unique_ptr<node_t>{top_wall});
+  sf::Vector2f topw_spawn{700, 0};
+  top_wall->box()->setPosition(topw_spawn);
+  top_wall->spawn_point(topw_spawn);
+  top_wall->box()->setSize(sf::Vector2f{20, input_g::top_wall_height()});
+  top_wall->teleport_boundry(-10);
+  top_wall->step_size(2);
+  top_wall->box()->setFillColor(sf::Color::Magenta);
+  top_wall->target(bird_ptr);
+  top_wall->invert(false);
+
+  auto bottom_wall = new wall_t{};
+  game->add(std::unique_ptr<node_t>{bottom_wall});
+  sf::Vector2f botw_spawn{700, 480};
+  bottom_wall->box()->setPosition(botw_spawn.x, botw_spawn.y - 50);
+  bottom_wall->box()->setSize(sf::Vector2f{20, input_g::bottom_wall_height()});
+  bottom_wall->box()->setFillColor(sf::Color::Magenta);
+  bottom_wall->spawn_point(botw_spawn);
+  bottom_wall->teleport_boundry(-10);
+  bottom_wall->step_size(2);
+  bottom_wall->target(bird_ptr);
+  bottom_wall->update_boundry(resource_g::window->getSize().x);
+  bottom_wall->invert(true);
+
   return root;
 }
 } // namespace bb

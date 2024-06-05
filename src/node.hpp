@@ -3,6 +3,7 @@
 #include <SFML/Graphics.hpp>
 #include <chrono>
 #include <list>
+#include <random>
 
 namespace bb {
 class node_t : public sf::Drawable {
@@ -125,6 +126,7 @@ public:
     offset_.x = (offset_.x + size_) % (frames_ * size_);
     sprite_.setTextureRect(sf::IntRect{offset_, sf::Vector2i{size_, size_}});
   }
+  sf::FloatRect bounds() const { return sprite_.getGlobalBounds(); }
 
   void render(sf::RenderTarget &t, sf::RenderStates s) const override {
     t.draw(sprite_, s);
@@ -152,10 +154,128 @@ public:
   }
   static sf::Vector2i new_mouse_position() { return mouse_pos_new_; }
   static sf::Vector2i old_mouse_position() { return mouse_pos_old_; }
+  static int random(int a, int b) {
+    std::uniform_int_distribution<> d(a, b);
+    return d(twister_);
+  }
+
+  static void update_wall_height(float min, float max) {
+    auto part1 = max - random(0, max);
+    auto part2 = max - part1;
+    auto *bigger = (part1 > part2) ? &part1 : &part2;
+    *bigger -= random(2, 4) * min;
+    top_wall_height_ = part1;
+    bottom_wall_height_ = part2;
+  }
+  static float top_wall_height() { return top_wall_height_; }
+  static float bottom_wall_height() { return bottom_wall_height_; }
 
 private:
   static inline sf::Vector2i mouse_pos_new_;
   static inline sf::Vector2i mouse_pos_old_;
+  static inline std::random_device rngdev_;
+  static inline std::mt19937 twister_{rngdev_()};
+  static inline float top_wall_height_;
+  static inline float bottom_wall_height_;
+};
+} // namespace bb
+
+namespace bb {
+enum class qcmd_t { goto_main_menu, goto_game, game_over };
+}
+
+namespace bb {
+struct cmdq_g {
+public:
+  cmdq_g() = delete;
+  static void push(qcmd_t cmd) { commands.push_back(cmd); }
+
+  static inline std::unique_ptr<node_t> menu_scene;
+  static inline std::unique_ptr<node_t> game_scene;
+  static inline std::unique_ptr<node_t> game_over;
+
+  static void update() {
+    while (commands.size()) {
+      switch (commands.front()) {
+      case qcmd_t::goto_main_menu:
+        active_scene = menu_scene.get();
+        break;
+      case qcmd_t::goto_game:
+        active_scene = game_scene.get();
+        break;
+      case qcmd_t::game_over:
+        active_scene = game_over.get();
+        break;
+      }
+      commands.pop_front();
+    }
+  }
+
+  static inline std::list<qcmd_t> commands;
+  static inline node_t *active_scene;
+};
+} // namespace bb
+
+namespace bb {
+class plat_t : public node_t {
+public:
+  void update_this() override {
+    if (target_)
+      if (box_.getGlobalBounds().intersects(target_->bounds()))
+        cmdq_g::push(qcmd_t::game_over);
+  }
+
+  void render(sf::RenderTarget &t, sf::RenderStates s) const override {
+    t.draw(box_, s);
+  }
+  void target(bird_t *ptr) { target_ = ptr; }
+  sf::RectangleShape *box() { return &box_; }
+
+private:
+  sf::RectangleShape box_;
+  bird_t *target_;
+};
+} // namespace bb
+
+namespace bb {
+class wall_t : public node_t {
+public:
+  void update_this() override {
+    if (box_.getPosition().x <= teleport_boundry_) {
+      box_.setPosition(spawn_point_);
+      box_.setSize(sf::Vector2f{box_.getSize().x,
+                                inverted_ ? input_g::bottom_wall_height()
+                                          : input_g::top_wall_height()});
+    }
+    if (box_.getPosition().x == update_boundry_ && inverted_) {
+      box_.setPosition(box_.getPosition().x, spawn_point_.y - box_.getSize().y);
+    }
+    if (target_)
+      if (box_.getGlobalBounds().intersects(target_->bounds()))
+        cmdq_g::push(qcmd_t::game_over);
+    box_.move(-step_size_, 0);
+  }
+
+  void render(sf::RenderTarget &t, sf::RenderStates s) const override {
+    t.draw(box_, s);
+  }
+  void target(bird_t *ptr) { target_ = ptr; }
+  sf::RectangleShape *box() { return &box_; }
+
+  void teleport_boundry(float x) { teleport_boundry_ = x; }
+  void spawn_point(sf::Vector2f x) { spawn_point_ = x; }
+  void step_size(float x) { step_size_ = x; }
+  void invert(bool x) { inverted_ = x; }
+  void update_boundry(float x) { update_boundry_ = x; }
+
+private:
+  sf::RectangleShape box_;
+  bird_t *target_;
+  sf::Vector2f spawn_point_;
+  float teleport_boundry_;
+  float update_boundry_;
+  float step_size_;
+  bool inverted_;
 };
 } // namespace bb
 
@@ -190,11 +310,14 @@ public:
   void label_color(const sf::Color &c) { label_.setFillColor(c); }
   void label_size(unsigned size) { label_.setCharacterSize(size); }
   void label_center() {
-    auto x = (box_.getPosition().x - label_.getGlobalBounds().width) / 2.f;
-    auto y = (box_.getPosition().y - label_.getGlobalBounds().height) / 2.f;
+    auto x =
+        (box_.getGlobalBounds().width - label_.getGlobalBounds().width) / 2.f;
+    auto y =
+        (box_.getGlobalBounds().height - label_.getGlobalBounds().height) / 2.f;
+
     label_.setPosition(box_.getPosition() +
-                       sf::Vector2f{x / 2 - box_.getOutlineThickness(),
-                                    y / 2 - box_.getOutlineThickness()});
+                       sf::Vector2f{x - box_.getOutlineThickness(),
+                                    y - box_.getOutlineThickness()});
   }
 
   void box_size(const sf::Vector2f &size) { box_.setSize(size); }
@@ -212,37 +335,5 @@ private:
   sf::RectangleShape box_;
   sf::Text label_;
   std::function<void(button_t *)> on_click_;
-};
-} // namespace bb
-
-namespace bb {
-enum class qcmd_t { goto_main_menu, goto_game };
-}
-
-namespace bb {
-struct cmdq_g {
-public:
-  cmdq_g() = delete;
-  static void push(qcmd_t cmd) { commands.push_back(cmd); }
-
-  static inline std::unique_ptr<node_t> menu_scene;
-  static inline std::unique_ptr<node_t> game_scene;
-
-  static void update() {
-    while (commands.size()) {
-      switch (commands.front()) {
-      case qcmd_t::goto_main_menu:
-        active_scene = menu_scene.get();
-        break;
-      case qcmd_t::goto_game:
-        active_scene = game_scene.get();
-        break;
-      }
-      commands.pop_front();
-    }
-  }
-
-  static inline std::list<qcmd_t> commands;
-  static inline node_t *active_scene;
 };
 } // namespace bb
