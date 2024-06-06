@@ -27,7 +27,24 @@ struct resource_g {
   static inline std::unique_ptr<sf::Texture> bird_texture{};
   static inline b2World *world_ptr{};
   static inline b2Body *bird_body{};
+  static inline unsigned long long score{};
+  static inline sf::Text *score_label{};
+  static inline wall_t *wall{};
 };
+
+void update_score() {
+  ++resource_g::score;
+  resource_g::score_label->setString("Score: " +
+                                     std::to_string(resource_g::score));
+}
+
+void reset_score() {
+  resource_g::score = 0;
+  resource_g::score_label->setString("Score: " +
+                                     std::to_string(resource_g::score));
+}
+
+float get_wall_x() { return resource_g::wall->position().x; }
 } // namespace bb
 
 int main() {
@@ -72,7 +89,7 @@ int main() {
 namespace bb {
 std::unique_ptr<sf::RenderWindow> create_window(unsigned w, unsigned h) {
   return std::unique_ptr<sf::RenderWindow>{new sf::RenderWindow{
-      sf::VideoMode{w, h}, "Bouncy Bird", sf::Style::None}};
+      sf::VideoMode{w, h}, "Bouncy Bird", sf::Style::Titlebar}};
 }
 } // namespace bb
 
@@ -109,7 +126,7 @@ std::unique_ptr<node_t> build_main_menu(const sf::Vector2u &ws) {
   std::unique_ptr<node_t> play_button{new button_t{}};
   dynamic_cast<button_t *>(play_button.get())
       ->label("Play", resource_g::main_font.get());
-  dynamic_cast<button_t *>(play_button.get())->label_color(sf::Color::White);
+  dynamic_cast<button_t *>(play_button.get())->label_color(sf::Color::Magenta);
   dynamic_cast<button_t *>(play_button.get())->label_size(50);
   dynamic_cast<button_t *>(play_button.get())->on_click([](node_t *) {
     cmdq_g::push(qcmd_t::goto_game);
@@ -117,7 +134,8 @@ std::unique_ptr<node_t> build_main_menu(const sf::Vector2u &ws) {
   constexpr float bw = 150.f, bh = 100.f;
   dynamic_cast<button_t *>(play_button.get())->box_size({bw, bh});
   dynamic_cast<button_t *>(play_button.get())->box_color(sf::Color::Black);
-  dynamic_cast<button_t *>(play_button.get())->box_stroke(sf::Color::White, 10);
+  dynamic_cast<button_t *>(play_button.get())
+      ->box_stroke(sf::Color::Magenta, 10);
   dynamic_cast<button_t *>(play_button.get())
       ->box_position({(ws.x - bw) / 2.f, (ws.y - bh) / 2.f});
   dynamic_cast<button_t *>(play_button.get())->label_center();
@@ -132,7 +150,7 @@ std::unique_ptr<node_t> build_game_over(const sf::Vector2u &ws) {
   std::unique_ptr<node_t> exit_button{new button_t{}};
   dynamic_cast<button_t *>(exit_button.get())
       ->label("Game Over", resource_g::main_font.get());
-  dynamic_cast<button_t *>(exit_button.get())->label_color(sf::Color::White);
+  dynamic_cast<button_t *>(exit_button.get())->label_color(sf::Color::Magenta);
   dynamic_cast<button_t *>(exit_button.get())->label_size(50);
   dynamic_cast<button_t *>(exit_button.get())->on_click([](node_t *) {
     resource_g::window->close();
@@ -140,11 +158,34 @@ std::unique_ptr<node_t> build_game_over(const sf::Vector2u &ws) {
   constexpr float bw = 400.f, bh = 100.f;
   dynamic_cast<button_t *>(exit_button.get())->box_size({bw, bh});
   dynamic_cast<button_t *>(exit_button.get())->box_color(sf::Color::Black);
-  dynamic_cast<button_t *>(exit_button.get())->box_stroke(sf::Color::White, 10);
   dynamic_cast<button_t *>(exit_button.get())
-      ->box_position({(ws.x - bw) / 2.f, (ws.y - bh) / 2.f});
+      ->box_stroke(sf::Color::Magenta, 10);
+  dynamic_cast<button_t *>(exit_button.get())
+      ->box_position({(ws.x - bw) / 2.f, (ws.y - 3 * bh) / 2.f});
   dynamic_cast<button_t *>(exit_button.get())->label_center();
   root->add(std::move(exit_button));
+
+  std::unique_ptr<node_t> score_button{new button_t{}};
+  dynamic_cast<button_t *>(score_button.get())
+      ->assign_label(resource_g::score_label);
+  dynamic_cast<button_t *>(score_button.get())
+      ->label("Score: " + std::to_string(resource_g::score),
+              resource_g::main_font.get());
+  dynamic_cast<button_t *>(score_button.get())->label_color(sf::Color::Magenta);
+  dynamic_cast<button_t *>(score_button.get())->label_size(50);
+  dynamic_cast<button_t *>(score_button.get())->on_click([](node_t *) {
+    cmdq_g::game_scene = build_game_scene();
+    cmdq_g::push(qcmd_t::goto_game);
+    reset_score();
+  });
+  dynamic_cast<button_t *>(score_button.get())->box_size({bw, bh * 0.8});
+  dynamic_cast<button_t *>(score_button.get())->box_color(sf::Color::Black);
+  dynamic_cast<button_t *>(score_button.get())
+      ->box_stroke(sf::Color::Magenta, 10);
+  dynamic_cast<button_t *>(score_button.get())
+      ->box_position({(ws.x - bw) / 2.f, (ws.y - bh / 2.f) / 2.f});
+  dynamic_cast<button_t *>(score_button.get())->label_center();
+  root->add(std::move(score_button));
   return root;
 }
 } // namespace bb
@@ -250,6 +291,7 @@ std::unique_ptr<node_t> build_game_scene() {
   top_wall->box()->setFillColor(sf::Color::Magenta);
   top_wall->target(bird_ptr);
   top_wall->invert(false);
+  resource_g::wall = top_wall;
 
   auto bottom_wall = new wall_t{};
   game->add(std::unique_ptr<node_t>{bottom_wall});

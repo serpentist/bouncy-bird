@@ -93,6 +93,11 @@ private:
 } // namespace bb
 
 namespace bb {
+float get_wall_x();
+void update_score();
+} // namespace bb
+
+namespace bb {
 class bird_t : public node_t {
 public:
   void texture(sf::Texture *t, sf::Vector2i offset = {}, int size = 0,
@@ -125,6 +130,15 @@ public:
 
     offset_.x = (offset_.x + size_) % (frames_ * size_);
     sprite_.setTextureRect(sf::IntRect{offset_, sf::Vector2i{size_, size_}});
+
+    if (sprite_.getPosition().x < get_wall_x())
+      before_wall_ = true;
+
+    if (before_wall_ && sprite_.getPosition().x >
+                            get_wall_x() + sprite_.getGlobalBounds().width) {
+      before_wall_ = false;
+      update_score();
+    }
   }
   sf::FloatRect bounds() const { return sprite_.getGlobalBounds(); }
 
@@ -141,6 +155,7 @@ private:
   sf::Sprite sprite_;
   decltype(std::chrono::system_clock::now()) time_since_flap_;
   b2Body *body_;
+  bool before_wall_;
 };
 } // namespace bb
 
@@ -181,8 +196,9 @@ private:
 } // namespace bb
 
 namespace bb {
+void reset_score();
 enum class qcmd_t { goto_main_menu, goto_game, game_over };
-}
+} // namespace bb
 
 namespace bb {
 struct cmdq_g {
@@ -267,6 +283,7 @@ public:
   void step_size(float x) { step_size_ = x; }
   void invert(bool x) { inverted_ = x; }
   void update_boundry(float x) { update_boundry_ = x; }
+  sf::Vector2f position() const { return box_.getPosition(); }
 
 private:
   sf::RectangleShape box_;
@@ -328,6 +345,7 @@ public:
       box_.setOutlineThickness(t);
   }
   void box_position(const sf::Vector2f &pos) { box_.setPosition(pos); }
+  void assign_label(sf::Text *&ptr) { ptr = &label_; }
 
 private:
   bool pressed_;
