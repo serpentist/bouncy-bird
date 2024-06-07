@@ -5,6 +5,13 @@ To build the game you will need to install:
 - SFML
 - Box2D
 
+On debian-based distros (ubuntu / wsl2 / mint),
+you should be able to get the pre-requisites like so:
+
+```console
+sudo apt install libbox2d-dev libsfml-dev
+```
+
 Once the dependencies are met:
 
 ```console
