@@ -17,7 +17,13 @@ Once the dependencies are met:
 ```console
 cmake -B build
 make -C build
-./build/bin/run
+./build/bouncybird/run
+```
+
+Optionally, you may pass a specific resolution as a parameter:
+
+```console
+./build/bouncybird/run 1920 1080
 ```
 
 # How to play
@@ -25,8 +31,7 @@ make -C build
 The aim of the game is to keep flying as long as possible.
 With each obstacle passed, the score is increased.
 
-Click to flap the bird's wings, when in game.
-Click the score button to play again.
+Press space to flap the bird's wings, when in game.
 That's all there is to it.
 Enjoy!
 

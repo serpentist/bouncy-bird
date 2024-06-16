@@ -3,16 +3,16 @@ find_package(SFML COMPONENTS system window network audio graphics REQUIRED)
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
-set(CMAKE_BUILD_TYPE "Release")
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
+	message(STATUS "Adding optimization at level 3")
 	add_compile_options(-O3)
 else()
+	message(STATUS "Adding debug symbols")
 	add_compile_options(-O0 -g)
 endif()
 
-set(MAIN_FONT_PATH ${CMAKE_BINARY_DIR}/bin/main_font.ttf)
-configure_file(main.cpp.in ${CMAKE_BINARY_DIR}/main.cpp @ONLY)
-add_executable(run ${CMAKE_BINARY_DIR}/main.cpp)
+add_executable(run main.cpp)
+target_include_directories(run PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 target_link_libraries(run PRIVATE
 	sfml-system
@@ -23,10 +23,19 @@ target_link_libraries(run PRIVATE
 	box2d
 )
 
-target_include_directories(run PRIVATE
-	${CMAKE_CURRENT_SOURCE_DIR}
+set(STAGING_DIR ${CMAKE_BINARY_DIR}/bouncybird)
+set_target_properties(run PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY ${STAGING_DIR}
 )
 
-set_target_properties(run PROPERTIES
-	RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
+file(MAKE_DIRECTORY ${STAGING_DIR}/font)
+
+file(COPY ${CMAKE_SOURCE_DIR}/asset/font/Exo-Regular.ttf
+		DESTINATION ${STAGING_DIR}/font)
+
+file(MAKE_DIRECTORY ${STAGING_DIR}/img)
+
+file(COPY ${CMAKE_SOURCE_DIR}/asset/img/BirdSprite.png
+		DESTINATION ${STAGING_DIR}/img)
+
+install(DIRECTORY ${STAGING_DIR} DESTINATION ${CMAKE_INSTALL_PREFIX})
